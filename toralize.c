@@ -1,6 +1,6 @@
 #include "toralize.h"
 
-Req *request(const char* dstip, const int dstport){
+Req *request(struct sockaddr_in *sock2){
     Req *req;
     req = malloc(sizeof(Req));
     if (req == NULL) {
@@ -10,15 +10,15 @@ Req *request(const char* dstip, const int dstport){
 
     req->vn = 4;
     req->cd = 1; // connect
-    req->dstip = inet_addr(dstip);
-    req->dstport = htons(dstport);
+    req->dstip = sock2->sin_addr.s_addr;
+    req->dstport = sock2->sin_port;
     strncpy(req->userId, USERNAME, 8);
     return req;
 }
 
-int main(int argc, char *argv[]){
-    char *host;
-    int port, s;
+ int connect(int s2, const struct sockaddr *sock2, socklen_t addrlen)
+ {
+    int s;
     struct sockaddr_in sock;
     Req *req;
     Res *res;
@@ -26,13 +26,10 @@ int main(int argc, char *argv[]){
     int success;
     char tmp[512];
 
-    if (argc < 3) {
-        fprintf(stderr, "Usage: %s <host> <port>\n", argv[0]);
-        return -1;
-    }
+    int (*p) (int ,const struct sockaddr*, socklen_t);
+   
+    p = dlsym(RTLD_NEXT, "connect");
 
-    host = argv[1];
-    port = atoi(argv[2]);
 
     s = socket(AF_INET, SOCK_STREAM, 0);
     if (s < 0) {
@@ -44,14 +41,14 @@ int main(int argc, char *argv[]){
     sock.sin_port = htons(PROXY_PORT);
     sock.sin_addr.s_addr = inet_addr(PROXY);
 
-    if (connect(s, (struct sockaddr *)&sock, sizeof(sock)) < 0) {
+    if (p(s, (struct sockaddr *)&sock, sizeof(sock)) < 0) {
         perror("Connection to proxy server failed\n");
         close(s);
         return -1;
     }
 
     printf("Connected to Proxy Successfully\n");
-    req = request(host, port);
+    req = request((struct sockaddr_in*)sock2);
     if (req == NULL) {
         close(s);
         return -1;
@@ -63,8 +60,6 @@ int main(int argc, char *argv[]){
         close(s);
         return -1;
     }
-
-    free(req);
 
     memset(buf, 0, ressize);
     if (read(s, buf, ressize) < 1){
@@ -81,21 +76,10 @@ int main(int argc, char *argv[]){
         return -1;
     }
 
-    printf("Successfully connected through proxy to %s:%d\n", host, port);
+    printf("Successfully connected through the proxy \n");
 
-    memset(tmp, 0 ,512);
-    snprintf(tmp, 511, "HEAD / HTTP/1.0\r\n"
-                        "Host:www.google.com\r\n"
-                        "\r\n"
-            );
-
-    write(s, tmp, strlen(tmp));
-    memset(tmp, 0, 512);
-    read(s, tmp, 511);
-    printf("'%s'\n",tmp);
-
-    
-    close(s);
+    dup2(s, s2);
     free(req);
+
     return 0;
 }

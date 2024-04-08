@@ -12,3 +12,16 @@ Toralize is a simple C program that demonstrates how to route network traffic th
 
 - C compiler (e.g., GCC)
 - Tor installed and configured on the local machine
+
+- Build it using
+
+```bash
+make
+```
+
+
+## Usage
+
+```bash
+toralize curl <IP Address>
+```
